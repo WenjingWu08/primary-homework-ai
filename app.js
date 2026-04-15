@@ -1,7 +1,9 @@
 const STORAGE_KEYS = {
   adaptive: "primary_ai_adaptive_state",
   wrongBank: "primary_ai_wrong_bank",
-  askHistory: "primary_ai_question_history"
+  askHistory: "primary_ai_question_history",
+  apiBase: "homework_ai_api_base",
+  authToken: "homework_ai_auth_token"
 };
 
 const state = {
@@ -13,7 +15,10 @@ const state = {
   adaptive: loadJSON(STORAGE_KEYS.adaptive, { level: 2, streakCorrect: 0, streakWrong: 0 }),
   wrongBank: loadJSON(STORAGE_KEYS.wrongBank, []),
   askHistory: loadJSON(STORAGE_KEYS.askHistory, []),
-  selectedImageName: ""
+  selectedImageName: "",
+  selectedImageBase64: "",
+  apiBase: localStorage.getItem(STORAGE_KEYS.apiBase) || "http://localhost:3001",
+  authToken: localStorage.getItem(STORAGE_KEYS.authToken) || ""
 };
 
 const gradeSelect = document.getElementById("gradeSelect");
@@ -28,17 +33,21 @@ const wrongBankPanel = document.getElementById("wrongBankPanel");
 const imagePreview = document.getElementById("imagePreview");
 const questionCoachOutput = document.getElementById("questionCoachOutput");
 const questionHistoryPanel = document.getElementById("questionHistoryPanel");
+const backendStatus = document.getElementById("backendStatus");
+const apiBaseInput = document.getElementById("apiBaseInput");
 
 init();
 
 async function init() {
+  bindEvents();
+  initBackendPanel();
+
   try {
     const resp = await fetch("./data/curriculum_sample.json");
     const data = await resp.json();
     state.lessons = data.lessons || [];
     state.questionBank = data.questionBank || [];
     initSelectors();
-    bindEvents();
     renderAdaptiveStatus();
     renderWrongBank();
     renderQuestionHistory();
@@ -61,6 +70,98 @@ function bindEvents() {
 
   document.getElementById("questionImageInput").addEventListener("change", previewImage);
   document.getElementById("analyzeQuestionBtn").addEventListener("click", analyzeStudentQuestion);
+
+  document.getElementById("saveApiBaseBtn").addEventListener("click", saveApiBase);
+  document.getElementById("registerDemoUserBtn").addEventListener("click", registerDemoUser);
+  document.getElementById("loginDemoUserBtn").addEventListener("click", loginDemoUser);
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+}
+
+function initBackendPanel() {
+  apiBaseInput.value = state.apiBase;
+  updateBackendStatus("正在检查后端连接...");
+  checkBackendHealth();
+}
+
+async function checkBackendHealth() {
+  try {
+    const resp = await fetch(`${state.apiBase}/health`);
+    if (!resp.ok) throw new Error(`health_${resp.status}`);
+    const json = await resp.json();
+    updateBackendStatus(`后端在线：${state.apiBase}（${json.service}）${state.authToken ? "，已登录" : "，未登录"}`);
+  } catch (e) {
+    updateBackendStatus("未连接后端（仍可使用本地 MVP）。");
+  }
+}
+
+function saveApiBase() {
+  state.apiBase = apiBaseInput.value.trim() || "http://localhost:3001";
+  localStorage.setItem(STORAGE_KEYS.apiBase, state.apiBase);
+  checkBackendHealth();
+}
+
+function logout() {
+  state.authToken = "";
+  localStorage.removeItem(STORAGE_KEYS.authToken);
+  checkBackendHealth();
+}
+
+async function registerDemoUser() {
+  try {
+    const payload = {
+      name: "demo_student",
+      password: "demo123456",
+      role: "student"
+    };
+    const resp = await apiFetch("/api/auth/register", {
+      method: "POST",
+      body: payload,
+      withAuth: false
+    });
+    updateBackendStatus(`演示账号已可用：${resp.name || payload.name}（可直接登录）`);
+  } catch (e) {
+    if (String(e.message || "").includes("409")) {
+      updateBackendStatus("演示账号已存在，可直接点击“登录演示账号”。");
+      return;
+    }
+    updateBackendStatus(`注册失败：${e.message}`);
+  }
+}
+
+async function loginDemoUser() {
+  try {
+    const resp = await apiFetch("/api/auth/login", {
+      method: "POST",
+      body: { name: "demo_student", password: "demo123456" },
+      withAuth: false
+    });
+    state.authToken = resp.token || "";
+    localStorage.setItem(STORAGE_KEYS.authToken, state.authToken);
+    updateBackendStatus(`登录成功：${resp.user?.name || "demo_student"}，后端同步已开启`);
+  } catch (e) {
+    updateBackendStatus(`登录失败：${e.message}`);
+  }
+}
+
+function updateBackendStatus(msg) {
+  backendStatus.textContent = msg;
+}
+
+async function apiFetch(path, { method = "GET", body = null, withAuth = true } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (withAuth && state.authToken) {
+    headers.Authorization = `Bearer ${state.authToken}`;
+  }
+  const resp = await fetch(`${state.apiBase}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!resp.ok) {
+    const errTxt = await resp.text();
+    throw new Error(`${resp.status} ${errTxt}`);
+  }
+  return resp.json();
 }
 
 function initSelectors() {
@@ -143,7 +244,7 @@ function renderQuestion() {
   feedback.innerHTML = "请输入答案后点击“提交答案”。";
 }
 
-function submitAnswer() {
+async function submitAnswer() {
   if (!state.currentQuestion) return;
   const userAns = answerInput.value.trim();
   if (!userAns) {
@@ -151,6 +252,7 @@ function submitAnswer() {
     return;
   }
   const q = state.currentQuestion;
+  const levelBefore = state.adaptive.level;
   const ok = normalize(userAns) === normalize(q.answer);
   if (ok) {
     markCorrect(q.id);
@@ -163,6 +265,28 @@ function submitAnswer() {
   renderAdaptiveStatus();
   renderWrongBank();
   persistState();
+
+  await syncHomeworkRecord({
+    lessonId: getSelectedLesson()?.id || "",
+    lessonTitle: q.lessonTitle,
+    subject: q.subject,
+    questionId: q.id,
+    userAnswer: userAns,
+    correctAnswer: q.answer,
+    isCorrect: ok,
+    difficultyBefore: levelBefore,
+    difficultyAfter: state.adaptive.level
+  });
+  if (!ok) {
+    await syncWrongQuestion({
+      questionId: q.id,
+      stem: q.stem,
+      lessonId: getSelectedLesson()?.id || "",
+      lessonTitle: q.lessonTitle,
+      subject: q.subject,
+      wrongAnswer: userAns
+    });
+  }
 }
 
 function showNextHint() {
@@ -231,6 +355,7 @@ function previewImage(e) {
   if (!file) {
     imagePreview.innerHTML = "未上传图片。";
     state.selectedImageName = "";
+    state.selectedImageBase64 = "";
     return;
   }
   state.selectedImageName = file.name;
@@ -241,29 +366,68 @@ function previewImage(e) {
       <img src="${url}" alt="题目预览" />
     </div>
   `;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.selectedImageBase64 = String(reader.result || "");
+  };
+  reader.readAsDataURL(file);
 }
 
-function analyzeStudentQuestion() {
+async function analyzeStudentQuestion() {
   const text = document.getElementById("studentQuestionText").value.trim();
   if (!text && !state.selectedImageName) {
     questionCoachOutput.innerHTML = "请先输入题目文字，或上传题目图片。";
     return;
   }
-  const guidance = buildGuidance(text);
+
+  let finalText = text;
+  let guidanceHtml = "";
+
+  if (state.authToken) {
+    try {
+      const ocrResp = await apiFetch("/api/ai/ocr", {
+        method: "POST",
+        body: {
+          questionText: text,
+          imageBase64: state.selectedImageBase64,
+          imageName: state.selectedImageName
+        }
+      });
+      const extracted = ocrResp.result?.extractedText || "";
+      if (extracted) finalText = extracted;
+
+      const tutorResp = await apiFetch("/api/ai/tutor", {
+        method: "POST",
+        body: {
+          questionText: finalText,
+          imageName: state.selectedImageName
+        }
+      });
+      const steps = (tutorResp.result?.guidance || []).map((x) => `<li>${escapeHTML(x)}</li>`).join("");
+      guidanceHtml = `<strong>AI 辅导建议（后端接口）</strong><ol class="list">${steps}</ol>`;
+    } catch (e) {
+      guidanceHtml = buildGuidance(finalText);
+      guidanceHtml += `<div class="feedback-bad">后端 AI 调用失败，已降级到本地策略：${escapeHTML(e.message)}</div>`;
+    }
+  } else {
+    guidanceHtml = buildGuidance(finalText);
+  }
+
   const record = {
     time: new Date().toISOString(),
-    text,
+    text: finalText,
     imageName: state.selectedImageName,
-    guidance
+    guidance: guidanceHtml
   };
   state.askHistory.unshift(record);
-  questionCoachOutput.innerHTML = guidance;
+  questionCoachOutput.innerHTML = guidanceHtml;
   renderQuestionHistory();
   persistState();
 }
 
 function buildGuidance(text) {
-  const lower = text.toLowerCase();
+  const lower = String(text || "").toLowerCase();
   if (lower.includes("乘") || lower.includes("加") || lower.includes("减") || lower.includes("数学")) {
     return `
       <strong>数学分步辅导建议</strong>
@@ -337,6 +501,24 @@ function resetProgress() {
   renderAdaptiveStatus();
   renderWrongBank();
   persistState();
+}
+
+async function syncHomeworkRecord(payload) {
+  if (!state.authToken) return;
+  try {
+    await apiFetch("/api/homework/records", { method: "POST", body: payload });
+  } catch (e) {
+    updateBackendStatus(`作业记录同步失败：${e.message}`);
+  }
+}
+
+async function syncWrongQuestion(payload) {
+  if (!state.authToken) return;
+  try {
+    await apiFetch("/api/wrongbook", { method: "POST", body: payload });
+  } catch (e) {
+    updateBackendStatus(`错题同步失败：${e.message}`);
+  }
 }
 
 function getSelectedLesson() {

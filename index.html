@@ -14,6 +14,23 @@
 
   <main class="container">
     <section class="card">
+      <h2>0) 后端联调（v0.1）</h2>
+      <div class="row">
+        <label class="full">
+          API Base URL
+          <input id="apiBaseInput" type="text" placeholder="默认 http://localhost:3001" />
+        </label>
+      </div>
+      <div class="row small-gap">
+        <button id="saveApiBaseBtn">保存 API 地址</button>
+        <button id="registerDemoUserBtn">注册演示账号</button>
+        <button id="loginDemoUserBtn">登录演示账号</button>
+        <button id="logoutBtn" class="danger">退出登录</button>
+      </div>
+      <div id="backendStatus" class="panel muted">未连接后端（仍可使用本地 MVP）。</div>
+    </section>
+
+    <section class="card">
       <h2>1) 课时规划：自动生成预习、学习、复习与作业</h2>
       <div class="row">
         <label>

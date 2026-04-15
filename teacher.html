@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>老师端学情看板（v0.1）</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>老师端学情看板（v0.1）</h1>
+    <p>查看班级学习记录、错题分布与近期作答情况</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>连接与登录</h2>
+      <div class="row">
+        <label class="full">
+          API Base URL
+          <input id="apiBaseInput" type="text" placeholder="http://localhost:3001" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="registerTeacherBtn">注册演示老师账号</button>
+        <button id="loginTeacherBtn">登录老师账号</button>
+        <button id="refreshBtn">刷新看板</button>
+        <button id="logoutBtn" class="danger">退出</button>
+      </div>
+      <div id="statusPanel" class="panel muted">未连接。</div>
+    </section>
+
+    <section class="card">
+      <h2>整体指标</h2>
+      <div id="metricsPanel" class="panel muted">暂无数据。</div>
+    </section>
+
+    <section class="card">
+      <h2>高频错题（Top10）</h2>
+      <div id="topWrongPanel" class="panel muted">暂无数据。</div>
+    </section>
+
+    <section class="card">
+      <h2>近期作答记录（最新20条）</h2>
+      <div id="recentPanel" class="panel muted">暂无数据。</div>
+    </section>
+  </main>
+
+  <script src="./teacher.js"></script>
+</body>
+</html>

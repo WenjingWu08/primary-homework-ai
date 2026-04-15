@@ -8,10 +8,11 @@
 
 ## 当前版本说明
 
-- 当前是 **前端可运行 MVP**（无后端依赖）。
+- 当前包含 **前端 MVP + 后端接口骨架（v0.1）**。
 - 已内置样例课程和题目数据，便于快速演示。
 - 错题库、答题记录、提问记录使用浏览器 `localStorage` 保存。
 - 已整理「教材/教辅官方来源清单」，见 `docs/textbook_sources_cn.md`。
+- 已提供 OCR + 大模型 API 占位实现，可快速替换真实服务。
 
 ## 快速运行
 
@@ -19,7 +20,7 @@
 如需本地服务（推荐，避免浏览器跨域限制）：
 
 ```bash
-cd primary-homework-ai
+cd homework-ai
 python3 -m http.server 8080
 ```
 
@@ -28,18 +29,87 @@ python3 -m http.server 8080
 ## 项目结构
 
 - `index.html`：页面结构
+- `teacher.html`：老师端看板页面（v0.1）
 - `styles.css`：样式
-- `app.js`：核心交互逻辑（课程规划、自适应练习、错题库、提问辅导）
+- `app.js`：核心交互逻辑（课程规划、自适应练习、错题库、提问辅导 + 后端联调）
+- `teacher.js`：老师端联调逻辑
 - `data/curriculum_sample.json`：样例课程/题目数据
 - `docs/textbook_sources_cn.md`：中国小学教材/教辅资料来源清单
+- `docs/v0.1-roadmap.md`：v0.1 产品路线图
+- `docs/api-test.md`：接口联调清单（curl）
+- `backend/`：后端接口骨架（用户、作业记录、错题库、AI）
+
+## 后端运行（v0.1 骨架）
+
+```bash
+cd homework-ai/backend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+默认后端地址：`http://localhost:3001`
+
+可选环境变量（`.env`）：
+
+- `DB_PROVIDER=sqlite|json`（默认 `sqlite`）
+- `OCR_PROVIDER` / `OCR_API_URL` / `OCR_API_KEY`
+- `LLM_PROVIDER` / `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL`
+
+### 已提供 API
+
+- 用户系统：
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `GET /api/auth/me`
+- 作业记录：
+  - `GET /api/homework/records`
+  - `POST /api/homework/records`
+- 错题库：
+  - `GET /api/wrongbook`
+  - `POST /api/wrongbook`
+  - `DELETE /api/wrongbook/:id`
+- AI 占位：
+  - `POST /api/ai/ocr`
+  - `POST /api/ai/tutor`
+- 老师端：
+  - `GET /api/teacher/overview`
+  - `GET /api/teacher/students/:userId/progress`
+
+## 常见问题
+
+### 1) `EADDRINUSE: address already in use :::3001`
+
+表示 3001 端口已有进程在运行（通常是你已经开过一次后端）。
+
+```bash
+lsof -nP -iTCP:3001 -sTCP:LISTEN
+kill <PID>
+```
+
+或者直接换端口启动：
+
+```bash
+PORT=3002 npm run dev
+```
+
+### 2) `ExperimentalWarning: SQLite is an experimental feature`
+
+这是 Node 内置 `node:sqlite` 的提示，不影响本项目运行。  
+如果你希望关闭该提示，可改用 JSON 存储：
+
+```bash
+DB_PROVIDER=json npm run dev
+```
 
 ## 后续可扩展方向
 
-1. 接入 OCR（拍照识题）和大模型推理服务（分步讲解/追问）。
-2. 建立教师端：班级管理、作业发布、学情统计。
-3. 与教材章节体系绑定：按出版社版本自动匹配课时目标。
-4. 增加家长端：学习报告、错因分析、复习提醒。
-5. 多角色权限和云端存储（学生、家长、老师、管理员）。
+1. 将 `backend/src/services/ocrService.js` 接入真实 OCR 供应商。
+2. 将 `backend/src/services/llmService.js` 接入真实大模型服务。
+3. 建立教师端：班级管理、作业发布、学情统计。
+4. 与教材章节体系绑定：按出版社版本自动匹配课时目标。
+5. 增加家长端：学习报告、错因分析、复习提醒。
+6. 多角色权限和云端存储（学生、家长、老师、管理员）。
 
 ## 合规与版权提示
 
