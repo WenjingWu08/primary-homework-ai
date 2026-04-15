@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小学课后辅导 AI 工具（MVP）</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>小学课后辅导 AI 工具</h1>
+    <p>围绕课时内容完成「预习-学习-复习-作业-纠错」闭环</p>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>1) 课时规划：自动生成预习、学习、复习与作业</h2>
+      <div class="row">
+        <label>
+          年级
+          <select id="gradeSelect"></select>
+        </label>
+        <label>
+          学科
+          <select id="subjectSelect"></select>
+        </label>
+        <label>
+          课时
+          <select id="lessonSelect"></select>
+        </label>
+        <button id="generatePlanBtn">生成课时学习计划</button>
+      </div>
+      <div id="planOutput" class="panel muted">请选择课时后生成。</div>
+    </section>
+
+    <section class="card">
+      <h2>2) 自适应作业辅导（分步提示 + 难度动态调整）</h2>
+      <div class="row small-gap">
+        <button id="startPracticeBtn">开始练习</button>
+        <button id="showWrongOnlyBtn">只练错题</button>
+        <button id="resetProgressBtn" class="danger">重置学习记录</button>
+      </div>
+      <div id="adaptiveStatus" class="panel muted"></div>
+      <div id="questionPanel" class="panel"></div>
+      <div class="row">
+        <input id="answerInput" type="text" placeholder="请输入答案（可输入 A/B/C 或数字、文字）" />
+        <button id="submitAnswerBtn">提交答案</button>
+        <button id="hintBtn">看一步提示</button>
+      </div>
+      <div id="feedback" class="panel muted">答题反馈会显示在这里。</div>
+      <h3>错题库</h3>
+      <div id="wrongBankPanel" class="panel muted">暂无错题。</div>
+    </section>
+
+    <section class="card">
+      <h2>3) 学生自主提问（拍照 / 打字）与辅导记录</h2>
+      <div class="row">
+        <label class="full">
+          文字输入题目
+          <textarea id="studentQuestionText" rows="4" placeholder="例如：三年级数学，38×6 为什么十位要加进位？"></textarea>
+        </label>
+      </div>
+      <div class="row">
+        <label class="full">
+          拍照上传题目（本地预览）
+          <input id="questionImageInput" type="file" accept="image/*" />
+        </label>
+      </div>
+      <div id="imagePreview" class="panel muted">未上传图片。</div>
+      <div class="row">
+        <button id="analyzeQuestionBtn">记录并生成辅导建议</button>
+      </div>
+      <div id="questionCoachOutput" class="panel muted">辅导建议会显示在这里。</div>
+      <h3>提问记录</h3>
+      <div id="questionHistoryPanel" class="panel muted">暂无提问记录。</div>
+    </section>
+
+    <section class="card">
+      <h2>教材与教辅来源（首版）</h2>
+      <p>已整理在 <code>docs/textbook_sources_cn.md</code>，用于后续接入授权资源和构建版本目录。</p>
+      <ul>
+        <li><a href="https://basic.smartedu.cn/" target="_blank" rel="noreferrer">国家中小学智慧教育平台</a></li>
+        <li><a href="https://www.pep.com.cn/" target="_blank" rel="noreferrer">人民教育出版社</a></li>
+        <li><a href="https://www.1088.com.cn/" target="_blank" rel="noreferrer">江苏凤凰教育出版社</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>提示：当前为 MVP 演示版，拍照识题 OCR 与大模型推理可在下一阶段接入。</small>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
